@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "budgetguard"
-version = "0.1.0"
+version = "0.2.0"
 description = "Drop-in budget, rate, and loop guard for autonomous AI agents. Framework-agnostic."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,7 +22,7 @@ dependencies = []
 
 [project.optional-dependencies]
 redis = ["redis>=5.0"]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "fakeredis>=2.20"]
 
 [project.urls]
 Homepage = "https://github.com/budgetguard/budgetguard"
@@ -33,3 +33,4 @@ packages = ["src/budgetguard"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"

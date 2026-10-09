@@ -82,3 +82,87 @@ class MemoryStore:
             first_seen=st.first_seen,
             recent=deque(st.recent, maxlen=st.recent.maxlen),
         )
+
+
+class RedisStore:
+    """Store backed by Redis, so spend is shared across processes/workers.
+
+    State per agent lives under ``{prefix}:{agent}``:
+
+    - a hash with ``spent`` and ``calls`` counters
+    - a capped list ``{prefix}:{agent}:recent`` of ``"ts|usd|signature"`` rows
+      (newest first), trimmed to ``maxlen``
+
+    Pass either a ready ``redis.Redis`` client (``client=...``) or a
+    ``url=`` to connect to. ``redis`` is an optional dependency.
+    """
+
+    def __init__(
+        self,
+        *,
+        client: object | None = None,
+        url: str | None = None,
+        prefix: str = "budgetguard",
+        maxlen: int = 512,
+    ) -> None:
+        if client is None:
+            try:
+                import redis
+            except Exception as exc:  # pragma: no cover - import-env dependent
+                raise ImportError(
+                    "RedisStore needs redis. Install with: pip install 'budgetguard[redis]'"
+                ) from exc
+            client = redis.Redis.from_url(url or "redis://localhost:6379/0")
+        self._r = client
+        self._prefix = prefix
+        self._maxlen = maxlen
+
+    def _keys(self, agent: str) -> tuple[str, str]:
+        base = f"{self._prefix}:{agent}"
+        return base, f"{base}:recent"
+
+    def record(self, agent: str, usd: float, signature: str, at: float) -> AgentState:
+        hkey, lkey = self._keys(agent)
+        # Signatures can contain '|', so keep it last and split with a bound.
+        row = f"{at}|{usd}|{signature}"
+        pipe = self._r.pipeline()
+        pipe.hincrbyfloat(hkey, "spent", usd)
+        pipe.hincrby(hkey, "calls", 1)
+        pipe.hsetnx(hkey, "first_seen", at)
+        pipe.lpush(lkey, row)
+        pipe.ltrim(lkey, 0, self._maxlen - 1)
+        pipe.execute()
+        return self.get(agent)
+
+    def get(self, agent: str) -> AgentState:
+        hkey, lkey = self._keys(agent)
+        pipe = self._r.pipeline()
+        pipe.hgetall(hkey)
+        pipe.lrange(lkey, 0, self._maxlen - 1)
+        h, rows = pipe.execute()
+        h = {_s(k): _s(v) for k, v in (h or {}).items()}
+        recent: deque[tuple[float, str, float]] = deque(maxlen=self._maxlen)
+        # Redis list is newest-first; reverse to oldest-first like MemoryStore.
+        for raw in reversed(rows or []):
+            ts, usd, sig = _s(raw).split("|", 2)
+            recent.append((float(ts), sig, float(usd)))
+        return AgentState(
+            spent_usd=float(h.get("spent", 0.0) or 0.0),
+            total_calls=int(float(h.get("calls", 0) or 0)),
+            first_seen=float(h.get("first_seen", time.time())),
+            recent=recent,
+        )
+
+    def reset(self, agent: str | None = None) -> None:
+        if agent is None:
+            keys = list(self._r.scan_iter(f"{self._prefix}:*"))
+            if keys:
+                self._r.delete(*keys)
+        else:
+            hkey, lkey = self._keys(agent)
+            self._r.delete(hkey, lkey)
+
+
+def _s(v: object) -> str:
+    """Decode a Redis value (bytes or str) to str."""
+    return v.decode() if isinstance(v, (bytes, bytearray)) else str(v)

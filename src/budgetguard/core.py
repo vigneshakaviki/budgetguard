@@ -220,6 +220,38 @@ class Governor:
                 signature=signature,
             )
 
+    def aguard(
+        self,
+        agent: str = "default",
+        *,
+        usage: UsageExtractor | None = None,
+        signature: Callable[..., str] | None = None,
+    ) -> Callable:
+        """Async counterpart of :meth:`guard` for coroutine functions.
+
+        Enforcement is identical: :meth:`check` runs before the awaited call,
+        usage is recorded after it returns. The store calls remain synchronous
+        (fast for :class:`~budgetguard.store.MemoryStore`; a brief blocking hop
+        for :class:`~budgetguard.store.RedisStore`).
+        """
+
+        def decorator(func: Callable) -> Callable:
+            @functools.wraps(func)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                sig = (
+                    signature(*args, **kwargs)
+                    if signature
+                    else _default_signature(func, args, kwargs)
+                )
+                self.check(agent, signature=sig)
+                result = await func(*args, **kwargs)
+                self._record_from_usage(agent, sig, usage, result)
+                return result
+
+            return wrapper
+
+        return decorator
+
     def _record_from_usage(
         self, agent: str, sig: str, usage: UsageExtractor | None, result: Any
     ) -> None:

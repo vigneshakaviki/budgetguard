@@ -27,10 +27,10 @@ from .errors import (
     RateLimited,
 )
 from .pricing import ModelPrice, cost_of, load_prices, price_for
-from .store import AgentState, MemoryStore, Store
+from .store import AgentState, MemoryStore, RedisStore, Store
 from .usage import Usage, extract_usage
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "Budget",
@@ -46,6 +46,7 @@ __all__ = [
     "load_prices",
     "Store",
     "MemoryStore",
+    "RedisStore",
     "AgentState",
     "Usage",
     "extract_usage",

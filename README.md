@@ -115,6 +115,14 @@ resp = any_client.generate(...)
 gov.record("researcher", model="gpt-4o",
            input_tokens=resp.in_tok, output_tokens=resp.out_tok)
 ```
+
+Async works too — use `@gov.aguard(...)` on a coroutine:
+
+```python
+@gov.aguard(agent="researcher")
+async def ask(messages):
+    return await client.chat.completions.create(model="gpt-4o", messages=messages)
+```
 </details>
 
 Adapters import their framework lazily — installing budgetguard never pulls in LiteLLM or LangChain.
@@ -161,13 +169,25 @@ A model with no registered price records **zero cost** but still counts toward c
 
 ## State backends
 
-Default is an in-process, thread-safe store. Need spend shared across workers? The `Store` protocol is just three methods (`record` / `get` / `reset`), so you can plug in Redis, Postgres, or anything else today. A built-in Redis store ships in v0.2.
+Default is an in-process, thread-safe store. Need spend shared across workers or processes? Use the built-in Redis store:
+
+```python
+from budgetguard import Governor, Budget, RedisStore
+
+gov = Governor(Budget(usd_per_day=5.00),
+               store=RedisStore(url="redis://localhost:6379/0"))
+```
+
+```bash
+pip install "budgetguard[redis]"
+```
+
+The `Store` protocol is just three methods (`record` / `get` / `reset`), so Postgres or any other backend plugs in the same way.
 
 ## Limitations (v0.1)
 
 - A call can overshoot a USD cap by one call (cost is post-call); the next is refused.
 - Rolling USD windows read a bounded per-agent log — raise its size for long windows at high volume.
-- No async decorator yet; use `check` / `record` in async code. *(v0.2.)*
 
 ## Run the demo
 
