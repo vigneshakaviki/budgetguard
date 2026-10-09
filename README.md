@@ -47,7 +47,47 @@ A `Budget` is plain config; any cap left `None` is not enforced.
 | `max_loop` | Trip if the same `(tool, args)` signature repeats this many times (default 10) |
 | `ttl_seconds` | Agent may not call after this long since first seen |
 
-## Three ways to use it
+## Integrates with any workflow
+
+budgetguard follows the same "hook one chokepoint, speak one standard schema"
+approach as LiteLLM / Helicone / OpenLLMetry.
+
+**Zero-config usage detection.** Omit `usage=` and budgetguard sniffs the
+response shape itself — OpenAI, Anthropic, LangChain `LLMResult`, OpenTelemetry
+`gen_ai.*` dicts, or generic token/cost dicts:
+
+```python
+@gov.guard(agent="researcher")          # no usage lambda needed
+def call_llm(messages):
+    return client.chat.completions.create(model="gpt-4o", messages=messages)
+```
+
+**LiteLLM — one hook, 100+ providers** (and CrewAI / DSPy / GraphRAG, which run on it):
+
+```python
+import litellm
+from budgetguard.adapters import LiteLLMGuard
+
+litellm.callbacks = [LiteLLMGuard(gov)]
+litellm.completion(model="gpt-4o", messages=[...])   # checked + recorded
+```
+On the LiteLLM **proxy**, the pre-call hook rejects the request with HTTP 429
+*before* it is sent once a cap trips.
+
+**LangChain — a callback handler:**
+
+```python
+from langchain_openai import ChatOpenAI
+from budgetguard.adapters import LangChainGuard
+
+llm = ChatOpenAI(model="gpt-4o", callbacks=[LangChainGuard(gov, agent="researcher")])
+llm.invoke("hi")     # on_llm_start -> check; on_llm_end -> record
+```
+
+Adapters import their framework lazily, so installing budgetguard never pulls in
+LiteLLM or LangChain.
+
+## Three ways to use it (manual)
 
 **Decorator** (shown above) — wrap the function that makes the call.
 

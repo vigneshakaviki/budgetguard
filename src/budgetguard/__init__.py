@@ -28,6 +28,7 @@ from .errors import (
 )
 from .pricing import ModelPrice, cost_of, load_prices, price_for
 from .store import AgentState, MemoryStore, Store
+from .usage import Usage, extract_usage
 
 __version__ = "0.1.0"
 
@@ -46,5 +47,7 @@ __all__ = [
     "Store",
     "MemoryStore",
     "AgentState",
+    "Usage",
+    "extract_usage",
     "__version__",
 ]

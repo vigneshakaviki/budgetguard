@@ -26,6 +26,7 @@ from .budget import Budget
 from .errors import AgentExpired, BudgetExceeded, LoopDetected, RateLimited
 from .pricing import cost_of
 from .store import MemoryStore, Store
+from .usage import extract_usage
 
 # A usage extractor maps a guarded function's return value to a cost input,
 # either (model, input_tokens, output_tokens) or a direct USD float.
@@ -195,11 +196,36 @@ class Governor:
 
         return decorator
 
+    def record_result(
+        self, agent: str = "default", *, result: Any = None, signature: str = ""
+    ) -> None:
+        """Account for a call by auto-detecting usage from its return value.
+
+        Recognises OpenAI / Anthropic SDK responses, LangChain ``LLMResult``,
+        OpenTelemetry ``gen_ai.*`` dicts, and generic token/cost dicts (see
+        :func:`budgetguard.usage.extract_usage`). Unknown shapes record zero USD
+        but still count toward call/rate/loop caps.
+        """
+        u = extract_usage(result)
+        if u is None:
+            self.record(agent, usd=0.0, signature=signature)
+        elif u.usd is not None:
+            self.record(agent, usd=u.usd, signature=signature)
+        else:
+            self.record(
+                agent,
+                model=u.model,
+                input_tokens=u.input_tokens,
+                output_tokens=u.output_tokens,
+                signature=signature,
+            )
+
     def _record_from_usage(
         self, agent: str, sig: str, usage: UsageExtractor | None, result: Any
     ) -> None:
+        # No explicit extractor -> auto-detect from the response shape.
         if usage is None:
-            self.record(agent, usd=0.0, signature=sig)
+            self.record_result(agent, result=result, signature=sig)
             return
         extracted = usage(result)
         if extracted is None:
