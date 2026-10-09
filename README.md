@@ -32,7 +32,7 @@ That's the whole thing. Wrap the function, set the caps, done.
 
 ## Why
 
-Every agent framework and "AI employee" platform hits the same three failures — and each reinvents a shaky guard for them:
+Autonomous agents hit the same three failure modes. budgetguard handles all three in-process, in one line — no gateway, no proxy, no database:
 
 | Problem | What happens | budgetguard |
 |---|---|---|
@@ -183,6 +183,18 @@ pip install "budgetguard[redis]"
 ```
 
 The `Store` protocol is just three methods (`record` / `get` / `reset`), so Postgres or any other backend plugs in the same way.
+
+## Alternatives & prior art
+
+This is a well-populated space — pick what fits before adopting budgetguard:
+
+- **[LiteLLM](https://docs.litellm.ai/docs/proxy/users)** (MIT) — the de-facto LLM gateway. Per-key/user/team budgets + rate limits, blocks requests pre-send, 100+ providers. Best if you want a central proxy and can run Postgres.
+- **[Bifrost](https://www.getmaxim.ai/articles/best-llm-gateways-for-cost-control-budgets-alerts-2026/)** — gateway with a 4-level budget hierarchy and metrics export.
+- **[GuardLoop](https://github.com/awesome-pro/guardloop)** — budget caps, circuit breakers, OpenTelemetry traces, LangChain callback. Similar scope to budgetguard, more observability.
+- **[agent-budget-guard-py](https://pypi.org/project/agent-budget-guard-py/)**, **[major-matters/budget-guard](https://github.com/major-matters/budget-guard)** — zero-dep in-process budget + loop guards. Very close to this project.
+- **[LoopGain](https://github.com/loopgain-ai/loopgain)** — goes further on *loops*: stops when the loop has actually **converged** and rolls back, instead of a fixed count. If your pain is loop quality (not just cost), start here.
+
+**Where budgetguard fits:** a small, dependency-free, in-process guard when you don't want a gateway/proxy and want the `@guard` decorator + autodetect to drop into existing code in one line. It does not do convergence-aware stopping (see LoopGain) or central multi-service policy (see LiteLLM).
 
 ## Limitations (v0.1)
 
