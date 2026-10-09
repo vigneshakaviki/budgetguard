@@ -5,9 +5,9 @@
 **A circuit breaker for AI agent spend.**
 Stop runaway costs and infinite loops — before the money is gone.
 
+[![CI](https://github.com/vigneshakaviki/budgetguard/actions/workflows/ci.yml/badge.svg)](https://github.com/vigneshakaviki/budgetguard/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-26%20passing-brightgreen.svg)](tests/)
 [![Zero deps](https://img.shields.io/badge/dependencies-0-success.svg)](pyproject.toml)
 
 </div>
